@@ -1,0 +1,29 @@
+from pydantic_settings import BaseSettings
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+class Settings(BaseSettings):
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+
+    database_url: str = f"sqlite+aiosqlite:///{BACKEND_DIR / 'data' / 'app.db'}"
+    chroma_persist_dir: str = str(BACKEND_DIR / "data" / "chroma")
+    upload_dir: str = str(BACKEND_DIR / "data" / "uploads")
+
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+    top_k: int = 5
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
+
+DATA_DIR = BACKEND_DIR / "data"
+UPLOAD_DIR = Path(settings.upload_dir)
+DATA_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
