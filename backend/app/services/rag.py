@@ -25,9 +25,10 @@ get_document_chunks = vector_store.get_chunks
 delete_document_chunks = vector_store.delete_chunks
 
 
-async def ingest_document(kb_id: str, doc_id: str, file_path: Path) -> int:
+async def ingest_document(kb_id: str, doc_id: str, file_path: Path, original_filename: str | None = None) -> int:
     text = parse_document(file_path)
-    return await vector_store.ingest(kb_id, doc_id, file_path.name, text)
+    filename = original_filename or file_path.name
+    return await vector_store.ingest(kb_id, doc_id, filename, text)
 
 
 def build_prompt(

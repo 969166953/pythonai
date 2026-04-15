@@ -94,10 +94,11 @@ async def upload_document(
     file_path.write_bytes(content)
 
     doc_id = doc.id
+    original_name = doc.filename
 
     async def process():
         try:
-            chunk_count = await ingest_document(kb_id, doc_id, file_path)
+            chunk_count = await ingest_document(kb_id, doc_id, file_path, original_name)
         except Exception as e:
             logger.error("Document ingestion failed: %s", e)
             chunk_count = -1
