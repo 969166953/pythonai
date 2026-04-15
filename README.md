@@ -151,6 +151,12 @@ frontend/
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | (必填) |
 | `DEEPSEEK_BASE_URL` | API 基础地址 | `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 模型名称 | `deepseek-chat` |
+| `EMBEDDING_MODEL` | 向量化模型 | `all-MiniLM-L6-v2` |
+| `CHUNK_SIZE` | 文档分块大小 | `800` |
+| `CHUNK_OVERLAP` | 分块重叠长度 | `100` |
+| `TOP_K` | 检索返回数量 | `5` |
+| `MAX_UPLOAD_BYTES` | 上传文件大小限制 | `52428800` (50MB) |
+| `ALLOWED_ORIGINS` | CORS 允许的域名 | `http://localhost:3000` |
 
 ## License
 
