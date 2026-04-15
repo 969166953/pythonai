@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,10 @@ class ConvResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UpdateConvRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
 
 
 class MessageResponse(BaseModel):
@@ -59,10 +63,44 @@ async def create_conversation(kb_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.patch("/{conv_id}", response_model=ConvResponse)
+async def update_conversation(
+    kb_id: str,
+    conv_id: str,
+    req: UpdateConvRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    conv = await db.get(ConversationModel, conv_id)
+    if not conv or conv.kb_id != kb_id:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    conv.title = req.title
+    await db.commit()
+    await db.refresh(conv)
+    return ConvResponse(
+        id=conv.id, title=conv.title, created_at=conv.created_at.isoformat()
+    )
+
+
+@router.delete("/{conv_id}")
+async def delete_conversation(
+    kb_id: str, conv_id: str, db: AsyncSession = Depends(get_db)
+):
+    conv = await db.get(ConversationModel, conv_id)
+    if not conv or conv.kb_id != kb_id:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    await db.delete(conv)
+    await db.commit()
+    return {"success": True}
+
+
 @router.get("/{conv_id}/messages", response_model=list[MessageResponse])
 async def list_messages(
     kb_id: str, conv_id: str, db: AsyncSession = Depends(get_db)
 ):
+    conv = await db.get(ConversationModel, conv_id)
+    if not conv or conv.kb_id != kb_id:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
     result = await db.execute(
         select(MessageModel)
         .where(MessageModel.conversation_id == conv_id)

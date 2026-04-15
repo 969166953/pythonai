@@ -10,16 +10,20 @@ async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<ApiResponse<T>> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-    return { success: false, error: err.detail || 'Request failed' };
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '请求失败' }));
+      return { success: false, error: err.detail || '请求失败' };
+    }
+    const data = await res.json();
+    return { success: true, data };
+  } catch {
+    return { success: false, error: '网络连接失败，请检查后端服务是否运行' };
   }
-  const data = await res.json();
-  return { success: true, data };
 }
 
 export interface KnowledgeBase {
@@ -59,6 +63,11 @@ export const api = {
         body: JSON.stringify({ name, description }),
       }),
     get: (id: string) => request<KnowledgeBase>(`/knowledge-bases/${id}`),
+    update: (id: string, data: { name?: string; description?: string }) =>
+      request<KnowledgeBase>(`/knowledge-bases/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     delete: (id: string) =>
       request<void>(`/knowledge-bases/${id}`, { method: 'DELETE' }),
   },
@@ -67,18 +76,26 @@ export const api = {
     list: (kbId: string) =>
       request<Document[]>(`/knowledge-bases/${kbId}/documents`),
     upload: async (kbId: string, file: File): Promise<ApiResponse<Document>> => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(
-        `${API_BASE}/knowledge-bases/${kbId}/documents`,
-        { method: 'POST', body: formData }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
-        return { success: false, error: err.detail };
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(
+          `${API_BASE}/knowledge-bases/${kbId}/documents`,
+          { method: 'POST', body: formData }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: '上传失败' }));
+          return { success: false, error: err.detail };
+        }
+        return { success: true, data: await res.json() };
+      } catch {
+        return { success: false, error: '网络连接失败，请检查后端服务是否运行' };
       }
-      return { success: true, data: await res.json() };
     },
+    chunks: (kbId: string, docId: string) =>
+      request<{ chunks: { index: number; content: string }[] }>(
+        `/knowledge-bases/${kbId}/documents/${docId}/chunks`
+      ),
     delete: (kbId: string, docId: string) =>
       request<void>(`/knowledge-bases/${kbId}/documents/${docId}`, {
         method: 'DELETE',
@@ -95,6 +112,16 @@ export const api = {
     messages: (kbId: string, convId: string) =>
       request<ChatMessage[]>(
         `/knowledge-bases/${kbId}/conversations/${convId}/messages`
+      ),
+    rename: (kbId: string, convId: string, title: string) =>
+      request<Conversation>(
+        `/knowledge-bases/${kbId}/conversations/${convId}`,
+        { method: 'PATCH', body: JSON.stringify({ title }) }
+      ),
+    delete: (kbId: string, convId: string) =>
+      request<void>(
+        `/knowledge-bases/${kbId}/conversations/${convId}`,
+        { method: 'DELETE' }
       ),
   },
 
