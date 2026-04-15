@@ -1,7 +1,8 @@
 import json
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import get_db
@@ -10,14 +11,20 @@ from ..services.rag import stream_chat
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
+MAX_MESSAGE_LENGTH = 5000
+
 
 @router.get("/stream")
 async def chat_stream(
-    message: str = Query(...),
+    message: str = Query(..., max_length=MAX_MESSAGE_LENGTH),
     kb_id: str = Query(...),
     conversation_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
+    conv = await db.get(ConversationModel, conversation_id)
+    if not conv or conv.kb_id != kb_id:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
     user_msg = MessageModel(
         conversation_id=conversation_id,
         role="user",
@@ -26,17 +33,28 @@ async def chat_stream(
     db.add(user_msg)
     await db.commit()
 
-    conv = await db.get(ConversationModel, conversation_id)
-    if conv and conv.title == "新对话":
+    if conv.title == "新对话":
         conv.title = message[:50]
         await db.commit()
+
+    result = await db.execute(
+        select(MessageModel)
+        .where(MessageModel.conversation_id == conversation_id)
+        .order_by(MessageModel.created_at.asc())
+    )
+    all_msgs = result.scalars().all()
+    history = [
+        {"role": m.role, "content": m.content}
+        for m in all_msgs
+        if m.id != user_msg.id
+    ]
 
     collected_content = []
     collected_sources = None
 
     async def generate():
         nonlocal collected_sources
-        async for chunk in stream_chat(kb_id, message):
+        async for chunk in stream_chat(kb_id, message, history=history):
             data_str = chunk.split("data: ", 1)[-1].strip()
             if data_str:
                 try:
