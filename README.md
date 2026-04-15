@@ -9,12 +9,18 @@
 
 ## 功能特性
 
-- **文档管理** — 支持 PDF、Word (DOCX/DOC)、TXT、Markdown 格式上传
-- **智能解析** — 自动分块、向量化存储，支持中英文
-- **多轮对话** — 基于上下文的连续问答，AI 记住对话历史
-- **来源引用** — 回答附带原文引用，可溯源验证
+- **文档管理** — 支持 PDF、Word (DOCX/DOC)、TXT、Markdown 格式上传，拖拽上传
+- **智能解析** — 自动分块、向量化存储，支持中英文语义检索
+- **多轮对话** — 基于上下文的连续问答，AI 记住对话历史（最近 10 轮）
+- **来源引用** — 回答附带原文引用，点击展开完整内容
 - **流式输出** — SSE 实时流式响应，打字机效果
+- **文档预览** — 点击已处理文档查看分块详情
+- **对话管理** — 对话重命名、删除，知识库名称和描述编辑
+- **暗色主题** — 亮色/暗色切换，跟随系统偏好，localStorage 持久化
+- **代码高亮** — Markdown 代码块语法着色，一键复制
+- **操作反馈** — Toast 通知、删除确认弹窗、错误边界防白屏
 - **响应式 UI** — 桌面侧栏 + 移动端抽屉，适配各种屏幕
+- **Docker 部署** — docker-compose 一键启动
 
 ## 技术栈
 
@@ -25,7 +31,8 @@
 | FastAPI | 异步 Web 框架 |
 | SQLAlchemy + SQLite | 数据持久化 (aiosqlite 异步驱动) |
 | ChromaDB | 向量数据库 (cosine 相似度检索) |
-| DeepSeek API | LLM 大语言模型 (OpenAI 兼容) |
+| SentenceTransformer | 文本向量化 (all-MiniLM-L6-v2) |
+| DeepSeek API | LLM 大语言模型 (OpenAI 兼容，可切换) |
 | LangChain | 文本分块 |
 
 ### 前端
@@ -36,6 +43,7 @@
 | Vite 8 | 构建工具 |
 | Tailwind CSS 4 | 样式 (oklch 色彩系统) |
 | react-markdown | Markdown 渲染 |
+| react-syntax-highlighter | 代码语法高亮 |
 | lucide-react | 图标库 |
 
 ## 快速开始
@@ -69,7 +77,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env，填入你的 DeepSeek API Key
 
-# 启动服务
+# 启动服务（首次启动会下载 Embedding 模型约 90MB）
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -104,8 +112,6 @@ docker-compose logs -f
 docker-compose down
 ```
 
-首次启动会自动下载 Embedding 模型（约 90MB），请耐心等待。
-
 ## 使用流程
 
 1. **创建知识库** — 在左侧栏点击「新建知识库」
@@ -114,35 +120,53 @@ docker-compose down
 4. **开始对话** — 切换到「对话」标签，新建对话，提出问题
 5. **查看引用** — AI 回答下方会显示引用的原文来源
 
-## API 接口
-
-| 方法 | 路径 | 功能 |
-|------|------|------|
-| GET | `/api/health` | 健康检查 |
-| GET/POST/DELETE | `/api/knowledge-bases` | 知识库 CRUD |
-| GET/POST/DELETE | `/api/knowledge-bases/:kbId/documents` | 文档管理 |
-| GET/POST | `/api/knowledge-bases/:kbId/conversations` | 对话管理 |
-| GET | `/api/knowledge-bases/:kbId/conversations/:convId/messages` | 消息历史 |
-| GET | `/api/chat/stream` | SSE 流式聊天 |
-
 ## 项目结构
 
 ```
 backend/
   app/
-    main.py              # FastAPI 入口
-    core/                # 配置、数据库
-    models/              # ORM 模型
-    api/                 # 路由端点
-    services/            # RAG 核心服务
+    main.py                 # FastAPI 入口，中间件，路由注册
+    core/
+      config.py             # 配置中心，所有参数环境变量驱动
+      database.py           # SQLAlchemy 异步引擎
+      deps.py               # 依赖注入（认证扩展点）
+    models/
+      schemas.py            # ORM 模型
+    api/
+      knowledge_bases.py    # 知识库 CRUD
+      documents.py          # 文档上传、预览、删除
+      conversations.py      # 对话管理
+      chat.py               # SSE 流式聊天
+    services/
+      rag.py                # RAG 编排层
+      parser.py             # 文档解析（扩展新格式）
+      vector_store.py       # 向量存储（可替换实现）
+      llm.py                # LLM 客户端（可切换提供商）
 
 frontend/
   src/
-    pages/               # 页面组件
-    components/          # UI 组件
-    hooks/               # 自定义 Hooks
-    lib/                 # API 客户端
+    App.tsx                 # 路由、主题、布局
+    pages/                  # 首页、知识库详情页
+    components/
+      chat/                 # 聊天视图、代码高亮
+      knowledge-base/       # 文档列表
+      layout/               # 侧栏、移动端头部
+      ui/                   # 通用组件（按钮、Toast、弹窗等）
+    hooks/                  # 主题、移动端导航
+    lib/api.ts              # API 客户端
 ```
+
+## API 接口
+
+| 方法 | 路径 | 功能 |
+|------|------|------|
+| GET | `/api/health` | 健康检查 |
+| GET/POST/PATCH/DELETE | `/api/knowledge-bases` | 知识库 CRUD |
+| GET/POST/DELETE | `/api/knowledge-bases/:kbId/documents` | 文档管理 |
+| GET | `/api/knowledge-bases/:kbId/documents/:docId/chunks` | 文档分块预览 |
+| GET/POST/PATCH/DELETE | `/api/knowledge-bases/:kbId/conversations` | 对话管理 |
+| GET | `/api/knowledge-bases/:kbId/conversations/:convId/messages` | 消息历史 |
+| GET | `/api/chat/stream` | SSE 流式聊天 |
 
 ## 环境变量
 
@@ -157,6 +181,27 @@ frontend/
 | `TOP_K` | 检索返回数量 | `5` |
 | `MAX_UPLOAD_BYTES` | 上传文件大小限制 | `52428800` (50MB) |
 | `ALLOWED_ORIGINS` | CORS 允许的域名 | `http://localhost:3000` |
+
+## 切换 LLM 提供商
+
+项目兼容所有 OpenAI 格式的 API，修改 `.env` 即可切换：
+
+```bash
+# OpenAI
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_BASE_URL=https://api.openai.com/v1
+DEEPSEEK_MODEL=gpt-4o
+
+# 通义千问
+DEEPSEEK_API_KEY=sk-xxx
+DEEPSEEK_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+DEEPSEEK_MODEL=qwen-plus
+
+# 本地 Ollama
+DEEPSEEK_API_KEY=ollama
+DEEPSEEK_BASE_URL=http://localhost:11434/v1
+DEEPSEEK_MODEL=qwen2.5
+```
 
 ## License
 
