@@ -90,9 +90,21 @@ npm run dev
 ### Docker 启动（可选）
 
 ```bash
-# 先配置 backend/.env
-docker-compose up
+# 1. 配置环境变量
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入 DeepSeek API Key
+
+# 2. 构建并启动
+docker-compose up -d
+
+# 3. 查看日志
+docker-compose logs -f
+
+# 4. 停止服务
+docker-compose down
 ```
+
+首次启动会自动下载 Embedding 模型（约 90MB），请耐心等待。
 
 ## 使用流程
 
