@@ -1,22 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, BookOpen, MessageSquare, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, Trash2, ChevronRight, Sun, Moon } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { KnowledgeBase } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { SidebarSkeleton } from '../ui/Skeleton';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useToast } from '../ui/Toast';
 
 interface SidebarProps {
   onNavigate?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar({ onNavigate, theme, onToggleTheme }: SidebarProps) {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { kbId } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const loadKnowledgeBases = async () => {
     setLoading(true);
@@ -40,16 +46,28 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       setCreating(false);
       navigate(`/kb/${res.data.id}`);
       onNavigate?.();
+      toast('知识库创建成功');
+    } else {
+      toast(res.error || '创建失败', 'error');
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const res = await api.knowledgeBases.delete(id);
+    setDeleteTarget(id);
+  }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const res = await api.knowledgeBases.delete(deleteTarget);
     if (res.success) {
-      setKnowledgeBases((prev) => prev.filter((kb) => kb.id !== id));
-      if (kbId === id) navigate('/');
+      setKnowledgeBases((prev) => prev.filter((kb) => kb.id !== deleteTarget));
+      if (kbId === deleteTarget) navigate('/');
+      toast('知识库已删除');
+    } else {
+      toast(res.error || '删除失败', 'error');
     }
+    setDeleteTarget(null);
   };
 
   const handleNavigate = (path: string) => {
@@ -133,7 +151,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               {kb.document_count}
             </span>
             <button
-              onClick={(e) => handleDelete(e, kb.id)}
+              onClick={(e) => handleDeleteClick(e, kb.id)}
               className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-danger/10 hover:text-danger transition-all"
             >
               <Trash2 size={13} />
@@ -150,11 +168,27 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
 
       {/* Footer */}
-      <div className="p-4 border-t border-border-light">
-        <p className="text-[11px] text-text-tertiary text-center">
+      <div className="p-4 border-t border-border-light flex items-center justify-between">
+        <p className="text-[11px] text-text-tertiary">
           Powered by DeepSeek + RAG
         </p>
+        {onToggleTheme && (
+          <button
+            onClick={onToggleTheme}
+            className="p-1.5 rounded-[var(--radius-sm)] text-text-tertiary hover:text-text-primary hover:bg-surface-elevated transition-all"
+            title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+          >
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+        )}
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="删除知识库"
+        message="删除后所有文档和对话记录将无法恢复，确定要删除吗？"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </aside>
   );
 }

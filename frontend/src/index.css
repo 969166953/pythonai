@@ -36,6 +36,46 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+[data-theme="dark"] {
+  --color-surface: oklch(14% 0.005 250);
+  --color-surface-secondary: oklch(18% 0.008 250);
+  --color-surface-elevated: oklch(22% 0.01 250);
+  --color-border: oklch(30% 0.01 250);
+  --color-border-light: oklch(25% 0.008 250);
+  --color-text-primary: oklch(93% 0.005 250);
+  --color-text-secondary: oklch(72% 0.01 250);
+  --color-text-tertiary: oklch(55% 0.01 250);
+  --color-accent: oklch(68% 0.2 255);
+  --color-accent-light: oklch(25% 0.06 255);
+  --color-accent-hover: oklch(74% 0.2 255);
+  --color-glass: oklch(18% 0.005 250 / 80%);
+  --color-glass-border: oklch(28% 0.01 250 / 50%);
+  --color-danger: oklch(65% 0.2 25);
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 20%);
+  --shadow-md: 0 4px 12px oklch(0% 0 0 / 30%), 0 1px 3px oklch(0% 0 0 / 20%);
+  --shadow-lg: 0 8px 30px oklch(0% 0 0 / 35%), 0 2px 8px oklch(0% 0 0 / 20%);
+  --shadow-glass: 0 8px 32px oklch(0% 0 0 / 30%);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: oklch(45% 0 0 / 40%);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: oklch(55% 0 0 / 60%);
+}
+
+[data-theme="dark"] .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-secondary) 0%,
+    oklch(26% 0.01 250) 40%,
+    var(--color-surface-secondary) 80%
+  );
+  background-size: 800px 100%;
+}
+
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
