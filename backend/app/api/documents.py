@@ -4,13 +4,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import UPLOAD_DIR
+from ..core.config import UPLOAD_DIR, settings
 from ..core.database import get_db, async_session
 from ..models.schemas import DocumentModel, KnowledgeBaseModel
-from ..services.rag import ingest_document, delete_document_chunks
+from ..services.rag import ingest_document, delete_document_chunks, get_document_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,8 @@ router = APIRouter(
 )
 
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md"}
+
+_background_tasks: set[asyncio.Task] = set()
 
 
 class DocResponse(BaseModel):
@@ -69,7 +71,19 @@ async def upload_document(
             detail=f"不支持的文件格式，仅支持: {', '.join(ALLOWED_EXTENSIONS)}",
         )
 
-    doc = DocumentModel(kb_id=kb_id, filename=file.filename or "unknown")
+    content = await file.read()
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件过大，最大支持 {settings.max_upload_bytes // (1024 * 1024)}MB",
+        )
+
+    filename = "".join(
+        c for c in (file.filename or "unknown")
+        if c.isalnum() or c in ".-_ ()\u4e00-\u9fff"
+    ) or "unknown"
+
+    doc = DocumentModel(kb_id=kb_id, filename=filename)
     db.add(doc)
     await db.commit()
     await db.refresh(doc)
@@ -77,34 +91,35 @@ async def upload_document(
     kb_upload_dir = UPLOAD_DIR / kb_id
     kb_upload_dir.mkdir(parents=True, exist_ok=True)
     file_path = kb_upload_dir / f"{doc.id}{suffix}"
-    content = await file.read()
     file_path.write_bytes(content)
 
     doc_id = doc.id
 
     async def process():
         try:
-            chunk_count = await asyncio.to_thread(
-                _sync_ingest, kb_id, doc_id, file_path
-            )
+            chunk_count = await ingest_document(kb_id, doc_id, file_path)
         except Exception as e:
             logger.error("Document ingestion failed: %s", e)
             chunk_count = -1
 
         async with async_session() as session:
             d = await session.get(DocumentModel, doc_id)
-            k = await session.get(KnowledgeBaseModel, kb_id)
             if d:
                 if chunk_count >= 0:
                     d.status = "ready"
                     d.chunk_count = chunk_count
-                    if k:
-                        k.document_count += 1
+                    await session.execute(
+                        update(KnowledgeBaseModel)
+                        .where(KnowledgeBaseModel.id == kb_id)
+                        .values(document_count=KnowledgeBaseModel.document_count + 1)
+                    )
                 else:
                     d.status = "error"
             await session.commit()
 
-    asyncio.create_task(process())
+    task = asyncio.create_task(process())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return DocResponse(
         id=doc.id,
@@ -115,14 +130,10 @@ async def upload_document(
     )
 
 
-def _sync_ingest(kb_id: str, doc_id: str, file_path: Path) -> int:
-    import asyncio
-
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(ingest_document(kb_id, doc_id, file_path))
-    finally:
-        loop.close()
+@router.get("/{doc_id}/chunks")
+async def list_document_chunks(kb_id: str, doc_id: str):
+    chunks = await get_document_chunks(kb_id, doc_id)
+    return {"chunks": chunks}
 
 
 @router.delete("/{doc_id}")
@@ -133,11 +144,17 @@ async def delete_document(
     if not doc or doc.kb_id != kb_id:
         raise HTTPException(status_code=404, detail="文档不存在")
 
-    kb = await db.get(KnowledgeBaseModel, kb_id)
-    if kb and kb.document_count > 0:
-        kb.document_count -= 1
+    try:
+        await delete_document_chunks(kb_id, doc_id)
+    except Exception as e:
+        logger.error("Failed to delete chunks, proceeding with DB cleanup: %s", e)
 
-    delete_document_chunks(kb_id, doc_id)
+    await db.execute(
+        update(KnowledgeBaseModel)
+        .where(KnowledgeBaseModel.id == kb_id)
+        .where(KnowledgeBaseModel.document_count > 0)
+        .values(document_count=KnowledgeBaseModel.document_count - 1)
+    )
 
     file_path = UPLOAD_DIR / kb_id
     for f in file_path.glob(f"{doc_id}.*"):

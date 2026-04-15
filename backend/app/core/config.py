@@ -13,9 +13,14 @@ class Settings(BaseSettings):
     chroma_persist_dir: str = str(BACKEND_DIR / "data" / "chroma")
     upload_dir: str = str(BACKEND_DIR / "data" / "uploads")
 
-    chunk_size: int = 500
-    chunk_overlap: int = 50
+    chunk_size: int = 800
+    chunk_overlap: int = 100
     top_k: int = 5
+
+    embedding_model: str = "all-MiniLM-L6-v2"
+
+    max_upload_bytes: int = 50 * 1024 * 1024  # 50MB
+    allowed_origins: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

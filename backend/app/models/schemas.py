@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
+from sqlalchemy import String, Integer, Text, ForeignKey, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..core.database import Base
@@ -34,6 +34,7 @@ class KnowledgeBaseModel(Base):
 
 class DocumentModel(Base):
     __tablename__ = "documents"
+    __table_args__ = (Index("ix_documents_kb_id", "kb_id"),)
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     kb_id: Mapped[str] = mapped_column(ForeignKey("knowledge_bases.id", ondelete="CASCADE"))
@@ -47,6 +48,7 @@ class DocumentModel(Base):
 
 class ConversationModel(Base):
     __tablename__ = "conversations"
+    __table_args__ = (Index("ix_conversations_kb_id", "kb_id"),)
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     kb_id: Mapped[str] = mapped_column(ForeignKey("knowledge_bases.id", ondelete="CASCADE"))
@@ -61,6 +63,7 @@ class ConversationModel(Base):
 
 class MessageModel(Base):
     __tablename__ = "messages"
+    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"),)
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=new_id)
     conversation_id: Mapped[str] = mapped_column(
