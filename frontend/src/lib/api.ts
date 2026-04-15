@@ -129,4 +129,22 @@ export const api = {
     const params = new URLSearchParams({ message, kb_id: kbId, conversation_id: convId });
     return new EventSource(`${API_BASE}/chat/stream?${params}`);
   },
+
+  // TODO: 用户认证
+  // auth: {
+  //   login: (email: string, password: string) =>
+  //     request<{ token: string }>('/auth/login', {
+  //       method: 'POST', body: JSON.stringify({ email, password }),
+  //     }),
+  //   register: (email: string, password: string, name: string) =>
+  //     request<{ token: string }>('/auth/register', {
+  //       method: 'POST', body: JSON.stringify({ email, password, name }),
+  //     }),
+  // },
+
+  // TODO: 对话导出
+  // export: {
+  //   markdown: (kbId: string, convId: string) =>
+  //     request<{ content: string }>(`/knowledge-bases/${kbId}/conversations/${convId}/export?format=markdown`),
+  // },
 };

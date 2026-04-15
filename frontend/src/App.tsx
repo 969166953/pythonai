@@ -50,6 +50,10 @@ function App() {
               path="/kb/:kbId/chat/:conversationId"
               element={<KnowledgeBasePage />}
             />
+            {/* TODO: 新页面路由在这里添加 */}
+            {/* <Route path="/login" element={<LoginPage />} /> */}
+            {/* <Route path="/settings" element={<SettingsPage />} /> */}
+            {/* <Route path="/kb/:kbId/analytics" element={<AnalyticsPage />} /> */}
           </Routes>
         </div>
       </div>

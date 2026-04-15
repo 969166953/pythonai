@@ -126,3 +126,19 @@ async def delete_chunks(kb_id: str, doc_id: str) -> None:
     except Exception as e:
         logger.error("Failed to delete chunks kb=%s doc=%s: %s", kb_id, doc_id, e)
         raise
+
+
+# TODO: 高级检索功能
+# async def hybrid_search(kb_id: str, query: str, top_k: int = 5) -> list[dict]:
+#     """混合检索 — 向量相似度 + 关键词 BM25 加权融合"""
+#     pass
+
+# TODO: 知识库统计
+# async def get_stats(kb_id: str) -> dict:
+#     """返回知识库的分块总数、向量维度、存储大小等信息"""
+#     pass
+
+# TODO: 删除整个知识库的向量集合
+# async def delete_collection(kb_id: str) -> None:
+#     """删除知识库时调用，清理整个 collection"""
+#     pass

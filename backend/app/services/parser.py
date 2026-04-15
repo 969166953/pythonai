@@ -65,6 +65,13 @@ PARSERS: dict[str, callable] = {
     ".pdf": _parse_pdf,
     ".docx": _parse_docx,
     ".doc": _parse_legacy_doc,
+    # TODO: 更多格式支持
+    # ".xlsx": _parse_excel,    # Excel 表格 (openpyxl)
+    # ".pptx": _parse_pptx,    # PowerPoint (python-pptx)
+    # ".html": _parse_html,    # 网页 (beautifulsoup4)
+    # ".csv": _parse_csv,      # CSV 表格
+    # ".epub": _parse_epub,    # 电子书
+    # ".json": _parse_json,    # 结构化数据
 }
 
 

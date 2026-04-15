@@ -30,3 +30,19 @@ def get_llm_client() -> AsyncOpenAI:
             base_url=settings.deepseek_base_url,
         )
     return _client
+
+
+# TODO: 多模型路由 — 根据任务类型选择不同模型
+# def get_llm_client_for(task: str = "chat") -> AsyncOpenAI:
+#     """
+#     task 类型:
+#       - "chat": 对话生成，用主模型
+#       - "summary": 摘要提取，可用轻量模型降低成本
+#       - "embedding": 文本向量化，用 embedding 专用模型
+#     """
+#     configs = {
+#         "chat": {"api_key": settings.deepseek_api_key, "base_url": settings.deepseek_base_url},
+#         "summary": {"api_key": settings.deepseek_api_key, "base_url": settings.deepseek_base_url},
+#     }
+#     cfg = configs.get(task, configs["chat"])
+#     return AsyncOpenAI(**cfg)

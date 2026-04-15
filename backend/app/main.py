@@ -56,6 +56,13 @@ app.include_router(documents.router, prefix="/api")
 app.include_router(conversations.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 
+# TODO: 新功能路由在这里注册
+# from .api import auth, users, export, webhooks
+# app.include_router(auth.router, prefix="/api")       # 登录注册
+# app.include_router(users.router, prefix="/api")      # 用户管理
+# app.include_router(export.router, prefix="/api")     # 对话导出
+# app.include_router(webhooks.router, prefix="/api")   # Webhook 回调
+
 
 @app.get("/api/health")
 async def health():
