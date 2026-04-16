@@ -112,6 +112,36 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### 内网部署（生产环境）
+
+适用于公司内网、无外网环境部署：
+
+```bash
+# 1. 配置环境变量
+cp backend/.env.example backend/.env
+vim backend/.env
+# 修改 ALLOWED_ORIGINS 为内网 IP，如 http://192.168.1.100
+# 如果内网无法访问 DeepSeek，可改用本地 Ollama:
+#   DEEPSEEK_BASE_URL=http://192.168.1.50:11434/v1
+#   DEEPSEEK_MODEL=qwen2.5
+
+# 2. 一键启动生产环境
+docker-compose -f docker-compose.prod.yml up -d --build
+
+# 3. 访问（直接用服务器 IP）
+# http://192.168.1.100
+```
+
+内网部署架构：
+```
+用户浏览器 → Nginx (:80)
+                ├── /          → 前端静态文件
+                └── /api/*     → 后端 FastAPI (:8000)
+```
+
+> 如果内网无法下载 Embedding 模型，可先在有网络的机器上运行一次，
+> 然后把 `backend/data/` 目录整体拷贝到目标服务器。
+
 ## 使用流程
 
 1. **创建知识库** — 在左侧栏点击「新建知识库」
