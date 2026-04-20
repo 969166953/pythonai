@@ -294,7 +294,7 @@ next_cursor = rows[-1].created_at.isoformat() if len(rows) > limit else None
 items = rows[:limit]
 ```
 
-默认 `limit=20`，上限 `100`。
+默认 `limit=20`，上限 `100`。超出上限通过 Pydantic `Field(le=100)` 约束，触发 422 错误响应，不做静默截断。
 
 ### CJK 文件名修复（I1）
 
@@ -365,7 +365,7 @@ def sanitize_filename(name: str) -> str:
 |------|------|
 | ChromaDB 测试慢 | 用 fake_embedding_fn 替代 SentenceTransformer |
 | POST SSE 破坏已有功能 | 不保留旧 GET 端点，前端同步改造 |
-| useCallback 引入死循环 | 每个修复先写测试验证不重复渲染 |
+| useCallback 引入死循环 | 用 React Testing Library + Jest spy 监听 fetch 调用次数，验证初始渲染只触发 1 次 loadKnowledgeBases |
 | E2E 依赖真实 LLM | E2E 中 mock `llm_client` 返回固定响应 |
 | jest + Vite 配置复杂 | 用 ts-jest preset + babel-jest |
 
