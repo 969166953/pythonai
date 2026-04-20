@@ -2034,12 +2034,80 @@ git commit -m "refactor(chat): ChatView 改用 streamChat + AbortController 替�
 `frontend/src/__tests__/components/DocumentList.test.tsx`:
 
 ```typescript
-// 测试文档删除点击后弹出 ConfirmDialog
-// 取消后不触发删除 API
-// 确认后触发删除
-```
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { DocumentList } from '../../components/knowledge-base/DocumentList';
 
-（实际内容基于组件结构写，此处略）
+const renderWithRouter = () =>
+  render(
+    <MemoryRouter initialEntries={['/kb/test-kb']}>
+      <Routes>
+        <Route path="/kb/:kbId" element={<DocumentList />} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+describe('DocumentList', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        items: [
+          { id: 'doc1', filename: 'test.txt', status: 'ready', chunk_count: 3, created_at: '2026-04-16T00:00:00Z' },
+        ],
+        next_cursor: null,
+      }),
+    });
+  });
+
+  afterEach(() => jest.resetAllMocks());
+
+  it('shows confirm dialog when clicking delete', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await screen.findByText('test.txt');
+
+    await user.hover(screen.getByText('test.txt'));
+    await user.click(screen.getAllByRole('button')[0]);  // 删除按钮
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/确认删除/)).toBeInTheDocument();
+  });
+
+  it('cancels delete when confirm dialog is dismissed', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await screen.findByText('test.txt');
+
+    await user.hover(screen.getByText('test.txt'));
+    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(screen.getByRole('button', { name: '取消' }));
+
+    // 只有 list 请求，没有 DELETE
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c) => c[1]?.method === 'DELETE'
+    );
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('sends DELETE when confirmed', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await screen.findByText('test.txt');
+
+    await user.hover(screen.getByText('test.txt'));
+    await user.click(screen.getAllByRole('button')[0]);
+    await user.click(screen.getByRole('button', { name: /确认删除/ }));
+
+    await new Promise((r) => setTimeout(r, 0));
+    const deleteCalls = (global.fetch as jest.Mock).mock.calls.filter(
+      (c) => c[1]?.method === 'DELETE'
+    );
+    expect(deleteCalls).toHaveLength(1);
+  });
+});
+```
 
 - [ ] **Step 2: 修改 DocumentList**
 
@@ -2066,7 +2134,194 @@ git commit -m "feat: 文档删除添加确认弹窗（I6）"
 - Create: `frontend/src/__tests__/components/Toast.test.tsx`
 - Create: `frontend/src/__tests__/components/ErrorBoundary.test.tsx`
 
-- [ ] **Step 1: 补充所有测试文件（完整代码略，按各组件行为编写）**
+- [ ] **Step 1: 写 useTheme 测试**
+
+`frontend/src/__tests__/hooks/useTheme.test.ts`:
+
+```typescript
+import { renderHook, act } from '@testing-library/react';
+import { useTheme } from '../../hooks/useTheme';
+
+describe('useTheme', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
+  it('returns light by default when no preference', () => {
+    const { result } = renderHook(() => useTheme());
+    expect(['light', 'dark']).toContain(result.current.theme);
+  });
+
+  it('reads from localStorage', () => {
+    localStorage.setItem('theme', 'dark');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe('dark');
+  });
+
+  it('toggles between light and dark', () => {
+    const { result } = renderHook(() => useTheme());
+    const initial = result.current.theme;
+    act(() => result.current.toggle());
+    expect(result.current.theme).not.toBe(initial);
+  });
+
+  it('persists to localStorage on toggle', () => {
+    const { result } = renderHook(() => useTheme());
+    act(() => result.current.toggle());
+    expect(localStorage.getItem('theme')).toBe(result.current.theme);
+  });
+
+  it('sets data-theme attribute on document', () => {
+    const { result } = renderHook(() => useTheme());
+    expect(document.documentElement.getAttribute('data-theme')).toBe(result.current.theme);
+  });
+});
+```
+
+- [ ] **Step 2: 写 useMobileNav 测试**
+
+`frontend/src/__tests__/hooks/useMobileNav.test.ts`:
+
+```typescript
+import { renderHook, act } from '@testing-library/react';
+import { useMobileNav } from '../../hooks/useMobileNav';
+
+describe('useMobileNav', () => {
+  it('detects mobile viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 500, writable: true });
+    const { result } = renderHook(() => useMobileNav());
+    expect(result.current.isMobile).toBe(true);
+  });
+
+  it('detects desktop viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1200, writable: true });
+    const { result } = renderHook(() => useMobileNav());
+    expect(result.current.isMobile).toBe(false);
+  });
+
+  it('toggle opens and closes drawer', () => {
+    const { result } = renderHook(() => useMobileNav());
+    act(() => result.current.toggle());
+    expect(result.current.isOpen).toBe(true);
+    act(() => result.current.toggle());
+    expect(result.current.isOpen).toBe(false);
+  });
+
+  it('close sets isOpen to false', () => {
+    const { result } = renderHook(() => useMobileNav());
+    act(() => result.current.open());
+    act(() => result.current.close());
+    expect(result.current.isOpen).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 3: 写 Toast 测试**
+
+`frontend/src/__tests__/components/Toast.test.tsx`:
+
+```typescript
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ToastProvider, useToast } from '../../components/ui/Toast';
+
+function Trigger() {
+  const { toast } = useToast();
+  return (
+    <>
+      <button onClick={() => toast('成功')}>success</button>
+      <button onClick={() => toast('错误', 'error')}>error</button>
+    </>
+  );
+}
+
+describe('Toast', () => {
+  it('shows success toast', async () => {
+    const user = userEvent.setup();
+    render(<ToastProvider><Trigger /></ToastProvider>);
+    await user.click(screen.getByText('success'));
+    expect(screen.getByText('成功')).toBeInTheDocument();
+  });
+
+  it('shows error toast', async () => {
+    const user = userEvent.setup();
+    render(<ToastProvider><Trigger /></ToastProvider>);
+    await user.click(screen.getByText('error'));
+    expect(screen.getByText('错误')).toBeInTheDocument();
+  });
+
+  it('auto-dismisses after timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    jest.useFakeTimers();
+    render(<ToastProvider><Trigger /></ToastProvider>);
+    await user.click(screen.getByText('success'));
+    expect(screen.getByText('成功')).toBeInTheDocument();
+    jest.advanceTimersByTime(3500);
+    await waitFor(() => expect(screen.queryByText('成功')).not.toBeInTheDocument());
+    jest.useRealTimers();
+  });
+});
+```
+
+- [ ] **Step 4: 写 ErrorBoundary 测试**
+
+`frontend/src/__tests__/components/ErrorBoundary.test.tsx`:
+
+```typescript
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+
+function Thrower({ shouldThrow }: { shouldThrow: boolean }) {
+  if (shouldThrow) throw new Error('test error');
+  return <div>OK</div>;
+}
+
+describe('ErrorBoundary', () => {
+  it('renders children when no error', () => {
+    render(
+      <ErrorBoundary>
+        <Thrower shouldThrow={false} />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('OK')).toBeInTheDocument();
+  });
+
+  it('renders fallback when child throws', () => {
+    // 抑制 console.error 噪音
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <ErrorBoundary>
+        <Thrower shouldThrow={true} />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText(/出错了/)).toBeInTheDocument();
+  });
+
+  it('reset button clears error state', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <ErrorBoundary>
+        <Thrower shouldThrow={true} />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText(/出错了/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /重试/ }));
+
+    rerender(
+      <ErrorBoundary>
+        <Thrower shouldThrow={false} />
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('OK')).toBeInTheDocument();
+  });
+});
+```
 
 - [ ] **Step 2: 运行测试验证覆盖率**
 
